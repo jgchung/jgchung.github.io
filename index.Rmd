@@ -1,0 +1,9 @@
+---
+title: "Index"
+author: "Jae Chung"
+date: "2023-03-19"
+output: html_document
+---
+
+# Jae Chung's Website
+### Thank you for visiting my website. This website contains some of the academic and professional projects I have worked on during my journey to becoming an expert in the world of data.
