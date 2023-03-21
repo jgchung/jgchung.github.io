@@ -1,0 +1,174 @@
+---
+title: "Beer Case Study"
+author: "Jae Chung"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo = FALSE}
+library(dplyr)
+library(plotly)
+library(ggplot2)
+library(tidyverse)
+
+# Call in the data
+beer = read.csv("Beers.csv")
+breweries = read.csv("Breweries.csv")
+
+breweries <- breweries %>% mutate_if(is.character, str_trim)
+
+#merge the data by primary key Brew_ID, since Brewery_id is the same thing but a foreign key in Beers data frame
+merged_data <- merge(breweries, beer, by.x = "Brew_ID", by.y = "Brewery_id", all = TRUE)
+
+# Remove missing data points based off of conclusions from initial Analysis
+beer <- na.omit(beer)
+merged_data <- na.omit(merged_data)
+
+
+# group by state and count number of breweries for each state
+Breweries_by_State <- breweries %>%
+  group_by(State) %>%
+  dplyr::summarize(num_Breweries = n()) 
+
+Breweries_by_State$region <- c("alabama", "alaska", "arizona", "arkansas", "california", 
+                "colorado", "connecticut","district of columbia", "delaware", "florida", "georgia", 
+                "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", 
+                "kentucky", "louisiana", "maine", "maryland", "massachusetts", 
+                "michigan", "minnesota", "mississippi", "missouri", "montana", 
+                "nebraska", "nevada", "new hampshire", "new jersey", "new mexico", 
+                "new york", "north carolina", "north dakota", "ohio", "oklahoma", 
+                "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota", 
+                "tennessee", "texas", "utah", "vermont", "virginia", "washington", 
+                "west virginia", "wisconsin", "wyoming")
+
+#drop that first column
+Breweries_by_State = Breweries_by_State[-1]
+states <- map_data("state")
+
+#merge states and Breweries_by_State tables
+#If all.x = TRUE, then all rows from the "x" data frame will be included in the output, even if there is no matching row in the "y" data frame. If all.x = FALSE (the default), then only the rows from the "x" data frame that have a match in the "y" data frame will be included in the output.
+map.df <- merge(states,Breweries_by_State, by="region", all.x=T)
+
+#map.df
+#order 
+map.df <- map.df[order(map.df$order),]
+
+#plot Map
+breweries.map <- ggplot(map.df, aes(x=long,y=lat,group=group))+
+  geom_polygon(aes(fill=num_Breweries))+
+  geom_path()+ 
+   scale_fill_gradient(low = "white", high = "red", na.value = "grey90")+
+  ggtitle("Number of Breweries by State")+
+coord_map() +
+theme(legend.position = "bottom", legend.justification = "left") +
+labs(fill = "Brewery Count")
+
+library(shiny)
+
+
+ui <- fluidPage(
+  sidebarLayout(
+   
+    sidebarPanel(
+       
+      selectInput("select", "Select from dropdown list",
+                    c("Beer Data"="beerdata","IBU Data" = "IBU","ABV Data" = "ABV", "IBU vs. ABV" = "IBUvsABV", "Breweries Heat Map" =  "BreweriesUSAMap"),
+                    selected = 1),
+      conditionalPanel(
+        condition = "input.select == 'IBU'",
+              selectInput("state1", "Choose a State",
+                    choices = state.abb,
+                    selected = 1),
+        radioButtons("radio1","Select a plot",
+                    choices = list("Histogram" = 1, "Boxplot" = 2),
+                    selected = 1),
+        ),
+        conditionalPanel(
+        condition = "input.select == 'ABV'",
+              selectInput("state2", label = "Choose a State",
+                    choices = state.abb,
+                    selected = 1),
+        radioButtons("radio2","Select a plot",
+                    choices = list("Histogram" = 1, "Boxplot" = 2),
+                    selected = 1),
+        ),
+        conditionalPanel(
+        condition = "input.select == 'IBUvsABV'",
+              selectInput("state3", "Choose a State",
+                    choices = state.abb,
+                    selected = 1),
+              radioButtons("radio3","Simple Linear Regression",
+                    choices = list("Yes" = 1, "No" = 2),
+                    selected = 1),
+        )),
+      mainPanel(
+          plotOutput(outputId = "distPlot"),
+          textOutput("Beer Data"),
+          fluidRow(
+          column(12,
+          dataTableOutput('table')
+          )),
+      )
+  )
+)
+
+server <-  function(input,output) {
+   
+  output$distPlot <- renderPlot({
+   
+    merged1 <- merged_data %>% filter(State == input$state1)
+
+    merged2 <- merged_data %>% filter(State == input$state2)
+
+    merged3 <- merged_data %>% filter(State == input$state3)
+    if(input$select == "beerdata"){
+      output$table <- renderDataTable(beer,
+          options = list(
+          pageLength = 5)
+        )
+          fluidRow(
+          column(12,
+          dataTableOutput('table')
+          ))
+    }else if(input$select == "IBU" && input$radio1 == 1){
+      x <- as.integer(merged1$IBU)
+      bins <- seq(min(x), max(x), length.out = 20)
+      hist(x, breaks = bins, col = "#75AADB", border = "white",
+         xlab = "IBU",
+         main = "Histogram of IBU Levels")
+    }else if(input$select == "IBU" && input$radio1 == 2){
+      boxplot(merged1$IBU, xlab = "IBU",
+         main = "Boxplot of IBU Levels")
+    }else if(input$select == "ABV" && input$radio2 == 1){
+      x <- merged2$ABV
+      bins <- seq(min(x), max(x), length.out = 20)
+      hist(x, breaks = bins,ylim=c(0, .13), col = "#75AADB", border = "white",
+         xlab = "IBU",
+         main = "Histogram of ABV Levels")
+    }else if(input$select == "ABV" && input$radio2 == 2){
+      boxplot(merged2$ABV, xlab = "ABV",
+         main = "Boxplot of ABV Levels")
+    }else if(input$select == "IBUvsABV"  && input$radio3 == 1){
+        merged3 %>% ggplot(aes(x=IBU,y=ABV)) +
+        geom_point(position = "jitter") +
+        geom_smooth(method = "lm") +
+        ggtitle("IBU vs. ABV") +
+        theme(text = element_text(size = 16))
+    } else if(input$select == "IBUvsABV"  && input$radio3 == 2){
+        merged3 %>% ggplot(aes(x=IBU,y=ABV)) +
+        geom_point(position = "jitter") +
+        ggtitle("IBU vs. ABV") +
+        theme(text = element_text(size = 16))
+    }else if(input$select == "BreweriesUSAMap"){
+      breweries.map
+    }
+  })
+}
+
+shinyApp(ui, server)
+
+```
