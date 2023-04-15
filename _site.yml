@@ -8,5 +8,7 @@ navbar:
       href: about_me.html
     - text: "Beer Study"
       href: Beer-Case_Study_Final.html
+    - text: "Attrition Study"
+      href: AttritionCaseStudy.html
     - text: "Century 21 Study"
       href: Century_21_Study.pdf
