@@ -1,0 +1,360 @@
+---
+title: "Attrition Case Study"
+author: "Jae Chung"
+date: "2023-04-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Loaded in every library needed for this analysis
+```{r}
+library(ggplot2)
+library(stringi)
+library(readxl)
+library(XML)
+library(rvest)
+library(naniar)
+library(e1071)
+library(caret)
+library(class)
+library(tidyverse)
+library(GGally)
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(rmarkdown)
+library(psych)
+library(Metrics)
+library(plotly)
+
+```
+
+#Imported CaseStudy2-data.csv file
+```{r}
+#Reading in employee data
+employee = read.csv(file.choose(), header = TRUE)
+employee
+
+#Verifying employee data
+head(employee)
+```
+
+#Cleaned data for potential missing values
+```{r}
+#Removing NAs in dataset
+is.na(employee)
+employeeClean = na.omit(employee)
+
+#Summarizing data
+str(employeeClean)
+summary(employeeClean)
+```
+
+#Changed OverTime to binary category
+```{r}
+#Converting the Overtime fields to a binary category for scalability
+employeeClean$OverTimeBinary = ifelse(employeeClean$OverTime =="Yes", 1,0) 
+```
+
+#Scaled columns for comparison of multiple variables
+```{r}
+#Scaling columns
+employeeClean$MonthlyIncomeScale = scale(employeeClean$MonthlyIncome)
+employeeClean$AgeScale = scale(employeeClean$Age)
+employeeClean$EnvironmentSatisfactionScale = scale(employeeClean$EnvironmentSatisfaction)
+employeeClean$OverTimeScale = scale(employeeClean$OverTimeBinary)
+employeeClean$YearsAtCompanyScale = scale(employeeClean$YearsAtCompany)
+
+#Verifying scale
+employeeClean
+head(employeeClean)
+
+```
+
+#Plotted correlation between Attrition and other columns
+```{r}
+#Attrition Count
+ggplotly(employeeClean %>% ggplot(aes(x = Attrition, fill = Attrition)) + geom_bar() + labs(title = "Attrition Count", x = "Attrition"))
+
+#Attrition Vs. Age
+ggplotly(employeeClean %>% ggplot(aes(x = Age, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Age"))
+
+#Attrition vs. Business Travel
+ggplotly(employeeClean %>% ggplot(aes(x = BusinessTravel, fill = Attrition)) + geom_bar(position = "fill") + ggtitle("Attrition Vs. Business Travel"))
+
+#Categorizing Daily Rates into groups
+min(employeeClean$DailyRate)
+max(employeeClean$DailyRate)
+employeeClean$DailyRateGroups <- as.factor(ifelse(employeeClean$DailyRate<501, "0-500", ifelse(employeeClean$DailyRate<1001, "501-1000", ifelse(employeeClean$DailyRate<1501, "1001-1500"))))
+
+#Attrition vs. Daily Rate
+ggplotly(employeeClean %>% ggplot(aes(x = DailyRateGroups, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Daily Rate"))
+
+#Attrition vs. Department
+ggplotly(employeeClean %>% ggplot(aes(x = Department, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Department"))
+
+#Categorizing Distance from Home into groups
+min(employeeClean$DistanceFromHome)
+max(employeeClean$DistanceFromHome)
+employeeClean$DistanceFromHomeGroups <- as.factor(ifelse(employeeClean$DistanceFromHome<11, "0-10", ifelse(employeeClean$DistanceFromHome<21, "11-20", ifelse(employeeClean$DistanceFromHome<31, "21-30"))))
+
+#Attrition vs. Distance From Home
+ggplotly(employeeClean %>% ggplot(aes(x = DistanceFromHomeGroups, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Distance From Home"))
+
+#Converting Education into Factors
+employeeClean$EducationFactor <- as.factor(employeeClean$Education)
+
+#Attrition vs. Education
+ggplotly(employeeClean %>% ggplot(aes(x = EducationFactor, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Education"))
+
+#Converting Education Field into Factors
+employeeClean$EducationFieldFactor <- as.factor(employeeClean$EducationField)
+
+#Attrition vs. Education Field
+ggplotly(employeeClean %>% ggplot(aes(x = EducationFieldFactor, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Education Field"))
+
+#Converting Environment Satisfaction into Factors
+employeeClean$EnvironmentSatisfactionFactor <- as.factor(employeeClean$EnvironmentSatisfaction)
+
+#Attrition vs. Environment Satisfaction
+ggplotly(employeeClean %>% ggplot(aes(x = EnvironmentSatisfactionFactor, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Environment Satisfaction"))
+
+#Attrition vs. Gender
+ggplotly(employeeClean %>% ggplot(aes(x = Gender, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Gender"))
+
+#Categorizing Hourly Rates into groups
+min(employeeClean$HourlyRate)
+max(employeeClean$HourlyRate)
+employeeClean$HourlyRateGroups <- as.factor(ifelse(employeeClean$HourlyRate<56, "0-55", ifelse(employeeClean$HourlyRate<81, "56-80", ifelse(employeeClean$HourlyRate<106, "81-105"))))
+
+#Attrition vs. Hourly Rates
+ggplotly(employeeClean %>% ggplot(aes(x = HourlyRateGroups, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Hourly Rates"))
+
+#Attrition vs. Job Involvement
+ggplotly(employeeClean %>% ggplot(aes(x = JobInvolvement, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Job Involvement"))
+
+#Attrition vs. Job Level
+ggplotly(employeeClean %>% ggplot(aes(x = JobLevel, fill = Attrition)) + geom_bar(position = "fill") + ggtitle("Attrition Vs. Job Level"))
+
+#Attrition vs. Job Role
+ggplotly(employeeClean %>% ggplot(aes(x = JobRole, fill = Attrition)) + geom_bar(position = "fill") + ggtitle("Attrition Vs. Job Role"))
+
+#Attrition Vs. Job Satisfaction
+ggplotly(employeeClean %>% ggplot(aes(x = JobSatisfaction, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Job Satisfaction"))
+
+#Attrition Vs. Marital Status
+ggplotly(employeeClean %>% ggplot(aes(x = MaritalStatus, fill = Attrition))+ geom_bar() + ggtitle("Attrition Vs. Marital Status"))
+
+#Attrition Vs. Monthly Income
+ggplotly(employeeClean %>% ggplot(aes(x = MonthlyIncome, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Monthly Income"))
+
+#Attrition Vs. Monthly Rate
+ggplotly(employeeClean %>% ggplot(aes(x = MonthlyRate, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Monthly Rate"))
+
+#Attrition Vs. Number of Companies Worked
+ggplotly(employeeClean %>% ggplot(aes(x = NumCompaniesWorked, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Number of Companies Worked"))
+
+#Attrition Vs. Overtime
+ggplotly(employeeClean %>% ggplot(aes(x = OverTime, fill = Attrition)) + geom_bar(position = "fill") + ggtitle("Attrition Vs. Overtime"))
+
+#Attrition Vs. Percent of Salary Hike
+ggplotly(employeeClean %>% ggplot(aes(x = PercentSalaryHike, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Percent of Salary Hike"))
+
+#Converting Performance Rating into Factors
+employeeClean$PerformanceRatingFactor <- as.factor(employeeClean$PerformanceRating)
+
+#Attrition Vs. Performance Rating
+ggplotly(employeeClean %>% ggplot(aes(x = PerformanceRatingFactor, fill = Attrition)) + geom_bar() + ggtitle("Attrition Vs. Performance Rating"))
+
+#Attrition Vs. Relationship Satisfaction
+ggplotly(employeeClean %>% ggplot(aes(x = RelationshipSatisfaction, fill = Attrition)) + geom_bar(position = "fill") + ggtitle("Attrition Vs. Relationship Satisfaction"))
+
+#Attrition Vs. Stock Option Level
+ggplotly(employeeClean %>% ggplot(aes(x = StockOptionLevel, fill = Attrition)) + geom_bar(position = "fill") + ggtitle("Attrition Vs. Stock Option Level"))
+
+#Attrition Vs. Total Working Years
+ggplotly(employeeClean %>% ggplot(aes(x = TotalWorkingYears, fill = Attrition)) + geom_bar(position = "fill") + ggtitle("Attrition Vs. Total Working Years"))
+
+#Attrition Vs. Training Times Last Year
+ggplotly(employeeClean %>% ggplot(aes(x = TrainingTimesLastYear, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Training Times Last Year"))
+
+#Attrition Vs. Work Life Balance
+ggplotly(employeeClean %>% ggplot(aes(x = WorkLifeBalance, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Work Life Balance"))
+
+#Attrition Vs. Years at the Company
+ggplotly(employeeClean %>% ggplot(aes(x = YearsAtCompany, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Years At the Company"))
+
+#Attrition Vs. Years in Current Role
+ggplotly(employeeClean %>% ggplot(aes(x = YearsInCurrentRole, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Years in Current Role"))
+
+#Attrition Vs. Years Since Last Promotion
+ggplotly(employeeClean %>% ggplot(aes(x = YearsSinceLastPromotion, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Years Since Last Promotion"))
+
+#Attrition Vs. Years with Current Manager
+ggplotly(employeeClean %>% ggplot(aes(x = YearsWithCurrManager, fill = Attrition)) + geom_histogram() + ggtitle("Attrition Vs. Years with Current Manager"))
+
+#Job Satisfaction Vs. Job Involvement
+ggplotly(employeeClean %>% ggplot(aes(x = JobSatisfaction, y = JobInvolvement, color = Attrition)) + geom_point(position = "jitter") + ggtitle("Job Satisfaction Vs. Job Involvement"))
+
+#Job Role Vs. Job Satisfaction
+ggplotly(employeeClean %>% ggplot(aes(x = JobRole, y = JobSatisfaction, color = Attrition)) + geom_point(position = "jitter") + ggtitle("Job Role Vs. Job Satisfaction"))
+
+#Job Role Vs. Work Life Balance
+ggplotly(employeeClean %>% ggplot(aes(x = JobRole, y = WorkLifeBalance, color = Attrition)) + geom_point(position = "jitter") + ggtitle("Job Role Vs. Work Life Balance"))
+
+```
+
+#Ran test to find K 
+```{r}
+# Loop for many k and the average of many training / test partition
+set.seed(4)
+
+iterations = 500
+numks = 30
+masterAcc = matrix(nrow = iterations, ncol = numks)
+
+for(j in 1:iterations)
+{
+  accs = data.frame(accuracy = numeric(30), k = numeric(30))
+  trainIndices = sample(1:dim(employeeClean)[1], round(0.70* dim(employeeClean)[1]))
+  train = employeeClean[trainIndices,]
+  test = employeeClean[-trainIndices,]
+  for(i in 1:numks)
+  {
+    classifications = knn(train[,c(37,38,40)], test[,c(37,38,40)], train$Attrition, prob = TRUE, k = i)
+    table(classifications, test$Attrition)
+    cm = confusionMatrix(table(classifications, test$Attrition))
+    masterAcc[j,i] = cm$overall[1]
+  }
+}
+MeanAcc = colMeans(masterAcc)
+plot(seq(1,numks,1),MeanAcc, type = "l")
+
+```
+
+#KNN Model
+```{r}
+#KNN
+classifications = knn(train[,c(37,38,40)], test[,c(37,38,40)], train$Attrition, prob = TRUE, k = 15) 
+classifications
+
+table(classifications, test$Attrition)
+cm = confusionMatrix(table(classifications, test$Attrition))
+cm
+# Accuracy : 0.8621, Sensitivity : 0.9381, Specificity : 0.3714  
+```
+
+#Naive Bayes
+```{r}
+#Selecting columns that contribute to Attrition
+model = employeeClean %>% select(c("MonthlyIncome","JobRole","Age","OverTime","EnvironmentSatisfaction","DailyRate","JobLevel","TotalWorkingYears","JobInvolvement","Attrition"))
+
+trainIndices = sample(1:dim(model)[1],round(.70 * dim(model)[1]))
+train = model[trainIndices,]
+test = model[-trainIndices,]
+
+set.seed(7)
+classifier1 = naiveBayes(model[,c(1,4,7)],model$Attrition)
+pred = predict(classifier1,newdata=test)
+CM = confusionMatrix(table(test$Attrition,pred))
+
+CM
+
+```
+
+#Found useful correlations  
+```{r}
+cor(employeeClean$MonthlyIncome ,employeeClean[,c(2,5,7,8,12,14,15,16,18,20,21,25,26,27,29,30, 31,32,33,34,35,36,37)])
+
+```
+
+#Linear Regression
+```{r}
+#Changing Attrition to numeric
+employeeClean$AttritionInt = if_else(employeeClean$Attrition =="Yes", 1,0)
+
+employeeClean$OverTimeFix = ifelse(employeeClean$OverTime=="Yes",1,0)
+
+fit = lm(AttritionInt~MonthlyIncome + OverTimeFix + JobLevel, employeeClean)
+
+summary(fit)
+confint(fit)
+plot(fit)
+AIC(fit)
+
+```
+
+#Imported No Salary Data
+```{r}
+employeeSalary = read.csv(file.choose(), header = TRUE)
+```
+
+#Cleaned No Salary Data
+```{r}
+employeeSalaryClean = na.omit(employeeSalary)
+
+head(employeeSalaryClean)
+employeeSalaryClean
+
+```
+```{r}
+cor(employeeClean$MonthlyIncome ,employeeClean[,c(2,5,7,8,12,14,15,16,18, 20,21,25,26,27,29,30,31,32,33,34,35,36,37)])
+
+```
+
+#RMSE
+```{r}
+set.seed(7)
+
+LMSalaryMod = lm(MonthlyIncome ~ JobLevel + Age + TotalWorkingYears + YearsAtCompany + WorkLifeBalance + YearsWithCurrManager + DistanceFromHome + DailyRate + StockOptionLevel + PerformanceRating+HourlyRate + OverTime + YearsSinceLastPromotion + RelationshipSatisfaction + YearsInCurrentRole + PercentSalaryHike + TrainingTimesLastYear + MonthlyRate + JobSatisfaction + JobInvolvement, data = employeeClean)
+
+summary(LMSalaryMod)
+
+rss = c(crossprod(LMSalaryMod$residuals))
+mse = rss / length(LMSalaryMod$residuals)
+rmse = sqrt(mse)
+sig2 = rss / LMSalaryMod$df.residual
+
+rmse
+
+```
+
+#Predicted Salary to include in file
+```{r}
+SalaryPredict = predict(LMSalaryMod, newdata = employeeSalaryClean)
+SalaryPredict
+```
+
+#Wrote Predicted Salary to file 
+```{r}
+employeeSalaryClean$PredictedSalary = unlist(SalaryPredict)
+PredictionSalaryDF = data.frame(c(employeeSalaryClean$ï..ID), c(employeeSalaryClean$PredictedSalary))
+
+SalaryPrediction = unlist(SalaryPredict)
+
+employeeSalary$SalaryPrediction = SalaryPrediction
+employeeSalary$SalaryPrediction
+head(employeeSalary)
+
+write.csv(PredictionSalaryDF, "SalaryPrediction.csv", row.names = TRUE)
+
+```
+
+#Predicted Attrition and wrote to file
+```{r}
+employeeNoAttri = read.csv(file.choose(), header = TRUE) 
+
+classifier1 = naiveBayes(model[,-c(1,5,9,10,11,14,21,23,24,28, 37:45)],model$Attrition)
+
+attrition_pred = predict(classifier1, employeeClean)
+employeeClean$PredictAttrition = unlist(attrition_pred)
+
+PredictionsAttritionDF = data.frame(c(employeeClean$ID), c(employeeClean$PredictAttrition))
+
+write.csv(PredictionsAttritionDF, "AttritionPrediction.csv", row.names = TRUE)
+
+```
