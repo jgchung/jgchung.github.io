@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+#Link to video presentation: https://youtu.be/HbXR6Fg7o4U
 
 #Loaded in every library needed for this analysis
 ```{r}
